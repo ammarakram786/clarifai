@@ -7,13 +7,27 @@ from clarifai_grpc.channel.clarifai_channel import ClarifaiChannel
 from clarifai_grpc.grpc.api import resources_pb2, service_pb2, service_pb2_grpc
 from clarifai_grpc.grpc.api.status import status_code_pb2
 from pydantic import BaseModel
+import os
+from dotenv import load_dotenv
 
 # Clarifai credentials
-PAT = "7607dc924f7d48cb9498d01f28fcb71d"
-USER_ID = "nxi9k6mtpija"
-APP_ID = "ScreenSnapp-Vision"
-MODEL_ID = "set-2"
-MODEL_VERSION_ID = "f2fb3217afa341ce87545e1ba7bf0b64"
+# PAT = "7607dc924f7d48cb9498d01f28fcb71d"
+# USER_ID = "nxi9k6mtpija"
+# APP_ID = "ScreenSnapp-Vision"
+# MODEL_ID = "set-2"
+# MODEL_VERSION_ID = "f2fb3217afa341ce87545e1ba7bf0b64"
+
+
+
+# Load environment variables from .env file
+load_dotenv()
+
+# Clarifai credentials
+PAT = os.getenv("PAT")
+USER_ID = os.getenv("USER_ID")
+APP_ID = os.getenv("APP_ID")
+MODEL_ID = os.getenv("MODEL_ID")
+MODEL_VERSION_ID = os.getenv("MODEL_VERSION_ID")
 
 # Setup Clarifai gRPC
 channel = ClarifaiChannel.get_grpc_channel()
