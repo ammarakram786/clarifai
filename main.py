@@ -1,7 +1,8 @@
 import os
 import base64
-from fastapi import FastAPI, UploadFile, File, requests, HTTPException
+from fastapi import FastAPI, UploadFile, File, requests, HTTPException, Depends, Header
 from fastapi.responses import JSONResponse
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
 from clarifai_grpc.channel.clarifai_channel import ClarifaiChannel
 from clarifai_grpc.grpc.api import resources_pb2, service_pb2, service_pb2_grpc
@@ -10,24 +11,18 @@ from pydantic import BaseModel
 import os
 from dotenv import load_dotenv
 
-# Clarifai credentials
-PAT = "7607dc924f7d48cb9498d01f28fcb71d"
-USER_ID = "nxi9k6mtpija"
-APP_ID = "ScreenSnapp-Vision"
-MODEL_ID = "set-2"
-MODEL_VERSION_ID = "f2fb3217afa341ce87545e1ba7bf0b64"
-
-
-
 # Load environment variables from .env file
 load_dotenv()
 
 # Clarifai credentials
-# PAT = os.getenv("PAT")
-# USER_ID = os.getenv("USER_ID")
-# APP_ID = os.getenv("APP_ID")
-# MODEL_ID = os.getenv("MODEL_ID")
-# MODEL_VERSION_ID = os.getenv("MODEL_VERSION_ID")
+PAT = os.getenv("CLARIFAI_PAT", "7607dc924f7d48cb9498d01f28fcb71d")
+USER_ID = os.getenv("CLARIFAI_USER_ID", "nxi9k6mtpija")
+APP_ID = os.getenv("CLARIFAI_APP_ID", "ScreenSnapp-Vision")
+MODEL_ID = os.getenv("CLARIFAI_MODEL_ID", "set-2")
+MODEL_VERSION_ID = os.getenv("CLARIFAI_MODEL_VERSION_ID", "f2fb3217afa341ce87545e1ba7bf0b64")
+
+# Bearer token for authentication - prioritize environment variable, fallback to test token
+BEARER_TOKEN = os.getenv("API_BEARER_TOKEN", "test_token_12345")
 
 # Setup Clarifai gRPC
 channel = ClarifaiChannel.get_grpc_channel()
@@ -35,10 +30,43 @@ stub = service_pb2_grpc.V2Stub(channel)
 metadata = (('authorization', 'Key ' + PAT),)
 user_data = resources_pb2.UserAppIDSet(user_id=USER_ID, app_id=APP_ID)
 
-app = FastAPI()
+# Security scheme
+security = HTTPBearer()
+
+app = FastAPI(
+    title="Clarifai Image Analysis API",
+    description="API for analyzing images using Clarifai AI models",
+    version="1.0.0",
+    docs_url="/docs",
+    redoc_url="/redoc"
+)
+
+async def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    """Verify the Bearer token"""
+    if credentials.credentials != BEARER_TOKEN:
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid authentication token",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    return credentials.credentials
+
+@app.get("/health")
+async def health_check():
+    """Health check endpoint"""
+    return {
+        "status": "healthy",
+        "service": "Clarifai Image Analysis API",
+        "version": "1.0.0",
+        "auth_enabled": True,
+        "token_source": "environment" if os.getenv("API_BEARER_TOKEN") else "default"
+    }
 
 @app.post("/analyze-image")
-async def predict_from_image(file: UploadFile = File(...)):
+async def predict_from_image(
+    file: UploadFile = File(...),
+    token: str = Depends(verify_token)
+):
     print("Received file: ")
     # Read image and encode
     image_bytes = await file.read()
@@ -79,18 +107,26 @@ async def predict_from_image(file: UploadFile = File(...)):
 
 
 
+import base64
+
 class ImageURL(BaseModel):
     url: str
 
 @app.post("/analyze-image-url")
-async def predict_from_url(image_url: ImageURL):
+async def predict_from_url(
+    image_url: ImageURL,
+    token: str = Depends(verify_token)
+):
     try:
         # Fetch the image from the URL
         response = requests.get(image_url.url)
         response.raise_for_status()
         image_bytes = response.content
-    except requests.exceptions.RequestException as e:
-        raise HTTPException(status_code=400, detail=f"Error fetching image: {e}")
+
+        # Encode the image bytes to base64
+        image_base64 = base64.b64encode(image_bytes).decode("utf-8")
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Error fetching or encoding image: {e}")
 
     # Send image to Clarifai
     response = stub.PostModelOutputs(
@@ -101,7 +137,7 @@ async def predict_from_url(image_url: ImageURL):
             inputs=[
                 resources_pb2.Input(
                     data=resources_pb2.Data(
-                        image=resources_pb2.Image(base64=image_bytes)
+                        image=resources_pb2.Image(base64=image_base64)
                     )
                 )
             ]
