@@ -15,6 +15,9 @@ from dotenv import load_dotenv
 # Load environment variables from .env file
 load_dotenv()
 
+# Get port from environment variable (Railway sets this)
+PORT = int(os.getenv("PORT", 8000))
+
 # Clarifai credentials - all must be provided via environment variables
 PAT = os.getenv("CLARIFAI_PAT")
 USER_ID = os.getenv("CLARIFAI_USER_ID")
