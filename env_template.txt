@@ -1,0 +1,9 @@
+# Clarifai API Configuration
+CLARIFAI_PAT=your_clarifai_pat_here
+CLARIFAI_USER_ID=your_clarifai_user_id_here
+CLARIFAI_APP_ID=your_clarifai_app_id_here
+CLARIFAI_MODEL_ID=your_clarifai_model_id_here
+CLARIFAI_MODEL_VERSION_ID=your_clarifai_model_version_id_here
+
+# API Authentication
+API_BEARER_TOKEN=your_secure_bearer_token_here
